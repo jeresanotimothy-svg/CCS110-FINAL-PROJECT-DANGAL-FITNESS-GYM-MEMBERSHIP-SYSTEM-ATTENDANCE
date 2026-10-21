@@ -1,0 +1,110 @@
+# Dangal Fitness System (CCS110 Finals)
+Gym / Fitness Center Membership & Attendance System
+
+Stack: HTML + Bootstrap 5 (frontend) - Node.js + Express (backend) - MySQL (database)
+
+## Run with XAMPP
+1. Install Node.js (LTS).
+2. Open the XAMPP Control Panel and start MySQL (and Apache for phpMyAdmin).
+3. Open http://localhost/phpmyadmin, go to the Import tab, and import `database/gym_db.sql`
+   (this recreates the database, so import it again after every update of this file).
+4. Copy `.env.example` to `.env`. Set `DB_PASSWORD` if your MySQL password is not blank, and replace `SESSION_SECRET`
+   with your own long random text (the file shows a command that makes one).
+5. In this folder run:  `npm install`  then  `npm start`
+6. Open http://localhost:3000
+
+Sample logins (change them before going online): admin/admin123 (Admin) - manager/manager123 (Admin) - staff/staff123 - frontdesk/front123 - cashier/cash123 (Staff)
+
+## Security: how the system protects data (basic level)
+| Protection | How it works |
+|---|---|
+| Login required | Every page of data is behind a login; without a valid session the server answers 401. |
+| Hashed passwords | Passwords are never stored as text. They are saved as salted `scrypt` hashes (`utils/password.js`), so even the database owner cannot read them. |
+| Password rules | 6 to 50 characters, no spaces. An Admin can reset a forgotten password on the User Accounts page. |
+| Brute-force protection | After 5 wrong passwords (same username, same computer) login is blocked for the rest of 15 minutes; 20 wrong tries from one computer also blocks it. |
+| Role-based access | Admin and Staff permissions are checked on the server, not only hidden on the screen (for example Staff cannot call the Trainers, Classes, Plans or Users data, edit, hide or see revenue). |
+| Disabled accounts | A disabled user is logged out on their next click and cannot log in again. Accounts are never deleted. |
+| Safe sessions | The login cookie is signed, HttpOnly (page scripts cannot read it), SameSite, HTTPS-only when online, and ends after 60 minutes without activity. |
+| SQL injection | Every query uses placeholders (`?`); table and column names come only from the code, and sort fields come from a fixed list. |
+| Input validation | The same rules run in the browser and on the server (`public/js/validators.js`). Output shown on pages is escaped (XSS). |
+| Cross-site requests | Requests that change data must come from this same site and must be JSON (`middleware/sameOrigin.js`). |
+| Browser protection headers | `X-Frame-Options`, `X-Content-Type-Options`, `Content-Security-Policy` and others (`middleware/securityHeaders.js`); data responses are never cached. |
+| No data loss | Nothing is deleted: records are hidden, accounts are disabled. |
+| Secrets stay secret | Database password and session secret live in `.env`, which is listed in `.gitignore`. |
+
+Still to do before going online with real data: use HTTPS (the host provides it), set `NODE_ENV=production`,
+change every sample password, and keep regular database backups.
+
+## Look and feel
+Calm forest-green theme with **Light mode** and **Dark mode**. Use the mode button in the top bar (on the login page, the button in the top-right corner). The choice is remembered in the browser; the first visit follows the computer's own light/dark setting. Colors are checked for readable contrast in both modes, and icons come from Bootstrap Icons.
+
+## Sort menu (Members and Attendance log)
+Pop-up messages (top-right) appear after a change and disappear by themselves.
+
+Click **Sort**, pick what to sort by Text fields sort alphabetically (**A to Z / Z to A**), date fields by oldest or newest first.
+(Members: First name, Last name, Email, Plan, Status, Date joined, Newest added; Attendance: Member name,
+Check-in time, Check-out time), then choose **Ascending** or **Descending**. The check marks show the current choice.
+The server only accepts the listed sort fields, so nothing else can be injected into the query.
+
+## Who can do what
+| Page | Admin | Staff |
+|---|---|---|
+| Dashboard | view | view |
+| Members | add, edit, status dropdown, hide | view, add |
+| Attendance | check in / out buttons, hide log rows | check in / out buttons |
+| Payments | add, edit, hide | view, add |
+| Class Bookings | add, change status, hide | view, add |
+| Plans, Trainers, Classes | everything | no access |
+| User Accounts | add, disable / enable | no access |
+
+Nothing is ever deleted. "Hide" sets `is_hidden = 1` (Admin can tick **Show hidden** and **Unhide**),
+and user accounts are disabled (`is_active = 0`) instead of deleted.
+
+## Rules checked on every input (browser and server use the same file: `public/js/validators.js`)
+- Names: letters only (spaces, apostrophes, hyphens and periods allowed).
+- Mobile number: 09XXXXXXXXX. Email must be valid. Username: letters, numbers, underscore.
+- Join date and payment date are set to today automatically (cannot be typed, so never past or future).
+- Class booking date: today up to 30 days ahead, only on a day the class runs, only if the class is not full,
+  and only for Active members.
+- Attendance has no typing: the Check In / Check Out buttons record the time. Only Active members can check in,
+  and nobody can check in twice.
+- GCash and Card payments need a reference number (the receipt); Cash payments have none.
+  The amount is filled in from the plan price.
+
+## Folder structure
+```
+dangal-fitness-system/
+├── server.js                  Express app entry point
+├── package.json
+├── .env / .env.example        DB settings, port, session secret
+├── .gitignore
+├── config/
+│   └── db.js                  MySQL connection pool
+├── middleware/
+│   ├── auth.js                requireLogin (also blocks disabled users), requireAdmin
+│   ├── loginLimiter.js        blocks password guessing
+│   ├── securityHeaders.js     browser protection headers
+│   ├── sameOrigin.js          blocks requests from other websites
+│   └── errorHandler.js
+├── utils/
+│   └── password.js            scrypt password hashing
+├── controllers/               the logic (talks to MySQL)
+│   ├── crudController.js      shared list / create / update / status / hide
+│   ├── authController.js      dashboardController.js   lookupController.js
+│   ├── memberController.js    planController.js        trainerController.js
+│   ├── classController.js     paymentController.js     enrollmentController.js (class bookings)
+│   ├── attendanceController.js  (check in / check out)
+│   └── userController.js      (disable / enable)
+├── routes/                    URL -> controller (+ who may use it)
+├── public/                    frontend (served by Express)
+│   ├── login.html  index.html  manage.html
+│   ├── css/theme.css          green theme (light + dark colours)
+│   └── js/theme.js  validators.js  common.js  config.js  manage.js
+│       manage/ (state.js  table.js  sort.js  board.js  form.js)
+└── database/
+    ├── gym_db.sql
+    └── queries.sql
+```
+
+## Tables (8, with 7 foreign keys)
+users, membership_plans, trainers, members, classes, payments, attendance, class_enrollments (junction / bookings)

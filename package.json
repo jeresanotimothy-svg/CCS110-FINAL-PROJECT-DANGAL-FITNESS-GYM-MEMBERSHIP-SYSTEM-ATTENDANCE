@@ -1,0 +1,16 @@
+{
+  "name": "dangal-fitness-system",
+  "version": "1.0.0",
+  "description": "Dangal Fitness System - Gym Membership & Attendance (CCS110 Finals)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cookie-session": "^2.1.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mysql2": "^3.9.7"
+  }
+}

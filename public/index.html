@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dangal Fitness System - Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link id="bi-css" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/theme.css" rel="stylesheet">
+  <script src="js/theme.js"></script>
+</head>
+<body>
+  <div id="navbar"></div>
+
+  <main class="container mt-4">
+    <h3 class="mb-3"><i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard</h3>
+
+    <!-- Numbers -->
+    <div class="row g-3 mb-4 row-cols-2 row-cols-lg-4" id="statRow">
+      <div class="col">
+        <div class="card stat-card h-100"><div class="card-body d-flex justify-content-between align-items-start">
+          <div><h6>Active Members</h6><h2 id="activeMembers">0</h2></div>
+          <span class="stat-icon icon-teal"><i class="bi bi-people-fill" aria-hidden="true"></i></span>
+        </div></div>
+      </div>
+      <div class="col">
+        <div class="card stat-card h-100"><div class="card-body d-flex justify-content-between align-items-start">
+          <div><h6>Inside Now</h6><h2 id="insideNow">0</h2></div>
+          <span class="stat-icon icon-green"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i></span>
+        </div></div>
+      </div>
+      <div class="col" id="revenueCol">
+        <div class="card stat-card h-100"><div class="card-body d-flex justify-content-between align-items-start">
+          <div><h6>Total Revenue</h6><h2 id="revenue">0</h2></div>
+          <span class="stat-icon icon-blue"><i class="bi bi-cash-coin" aria-hidden="true"></i></span>
+        </div></div>
+      </div>
+      <div class="col" id="classesCol">
+        <div class="card stat-card h-100"><div class="card-body d-flex justify-content-between align-items-start">
+          <div><h6>Classes</h6><h2 id="classes">0</h2></div>
+          <span class="stat-icon icon-amber"><i class="bi bi-calendar-event-fill" aria-hidden="true"></i></span>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- Check-in, top members, recent check-ins -->
+    <div class="row g-3 mb-4">
+
+      <div class="col-12 col-md-6 col-xl-4">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-person-check-fill" aria-hidden="true"></i>Quick Check-In / Check-Out</div>
+          <div class="card-body d-flex flex-column">
+            <label for="memberSelect" class="form-label">Member</label>
+            <select id="memberSelect" class="form-select mb-3"></select>
+            <div class="row g-2">
+              <div class="col-6"><button id="checkinBtn" class="btn btn-success w-100"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i>Check In</button></div>
+              <div class="col-6"><button id="checkoutBtn" class="btn btn-danger w-100"><i class="bi bi-box-arrow-right" aria-hidden="true"></i>Check Out</button></div>
+            </div>
+            <a href="manage.html?m=attendance" class="btn btn-outline-secondary w-100 mt-auto"><i class="bi bi-grid-3x3-gap-fill" aria-hidden="true"></i>Open full check-in board</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-6 col-xl-4">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-trophy-fill" aria-hidden="true"></i>Top Members by Visits</div>
+          <div class="table-responsive">
+            <table class="table table-striped mb-0">
+              <thead><tr><th scope="col">Member</th><th scope="col">Visits</th></tr></thead>
+              <tbody id="topMembers"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-xl-4">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-clock-history" aria-hidden="true"></i>Recent Check-Ins</div>
+          <ul class="list-group list-group-flush" id="recentList"></ul>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="container text-center py-4">
+    <small>Dangal Fitness System &middot; CCS110 Information Management 1</small>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/validators.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    // Messages appear as a pop-up that disappears by itself (showToast in common.js)
+    function showMessage(text, type) {
+      showToast(text, type);
+    }
+
+    function setText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+
+    async function loadDashboard() {
+      const data = await api('/api/dashboard/summary');
+      setText('activeMembers', data.counts.active_members);
+      setText('insideNow', data.counts.inside_now);
+      setText('revenue', '₱' + Number(data.counts.total_revenue).toLocaleString());    // Admin only (card removed for Staff)
+      setText('classes', data.counts.classes);                                          // Admin only
+
+      let rows = '';
+      data.topMembers.forEach(m => { rows += `<tr><td>${esc(m.member_name)}</td><td>${esc(m.visits)}</td></tr>`; });
+      document.getElementById('topMembers').innerHTML = rows || '<tr><td colspan="2">No data</td></tr>';
+
+      const attendance = await api('/api/attendance');
+      let items = '';
+      attendance.slice(0, 5).forEach(a => {
+        const state = a.check_out ? badge('Out', 'out') : badge('In', 'in');
+        items += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>${esc(a.member_name)}<br><small class="text-muted">${esc(a.check_in)}</small></span>${state}</li>`;
+      });
+      document.getElementById('recentList').innerHTML = items || '<li class="list-group-item">No check-ins yet</li>';
+    }
+
+    async function loadMembers() {
+      const members = await api('/api/lookup/members');
+      let options = '<option value="">-- Select member --</option>';
+      members.filter(m => m.status === 'Active').forEach(m => {
+        options += `<option value="${m.member_id}">${esc(m.first_name + ' ' + m.last_name)}</option>`;
+      });
+      document.getElementById('memberSelect').innerHTML = options;
+    }
+
+    async function quickAction(path, doneText) {
+      const select = document.getElementById('memberSelect');
+      if (select.value === '') { showMessage('Please select a member.', 'warning'); return; }
+      try {
+        await api('/api/attendance/' + path, 'POST', { member_id: select.value });
+        showMessage(select.options[select.selectedIndex].text + ' ' + doneText, 'success');
+        loadDashboard();
+      } catch (err) { showMessage(err.message, 'danger'); }
+    }
+
+    document.getElementById('checkinBtn').addEventListener('click', () => quickAction('checkin', 'checked in.'));
+    document.getElementById('checkoutBtn').addEventListener('click', () => quickAction('checkout', 'checked out.'));
+
+    (async () => {
+      await loadNavbar();
+
+      // Staff do not see money totals or the Classes card
+      if (window.currentUser.role !== 'Admin') {
+        document.getElementById('revenueCol').remove();
+        document.getElementById('classesCol').remove();
+        document.getElementById('statRow').className = 'row g-3 mb-4 row-cols-2';
+      }
+      loadDashboard();
+      loadMembers();
+    })();
+  </script>
+</body>
+</html>
